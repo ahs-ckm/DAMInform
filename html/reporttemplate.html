@@ -1,0 +1,117 @@
+<html>
+<head>
+<!--     <link href="/stylesheets/overlap.css" rel="stylesheet/css" type="text/css"> -->
+
+</head>
+<style>
+/* Tooltip container */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  /* border-bottom: 1px dotted black;  *//* If you want dots under the hoverable text */
+}
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+  visibility: hidden;
+  font-size: 16px;
+  width: 520px;
+  background-color: grey;
+  color: #fff;
+  text-align: left;
+  padding: 5px 0;
+  border-radius: 3px;
+ 
+  /* Position the tooltip text - see examples below! */
+  position: absolute;
+  z-index: 1;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  cursor: pointer;
+}
+
+.table-header-rotated {
+  border-collapse: collapse;
+}
+
+.no-csstransforms .table-header-rotated th {
+  padding: 5px 10px;
+}
+
+.csstransforms .table-header-rotated td {
+    width: 30px;
+  }
+ 
+.table-header-rotated td {
+  text-align: center;
+  padding: 10px 5px;
+  border: 1px solid #ccc;
+}
+
+.csstransforms .table-header-rotated th.rotate {
+  height: 140px;
+  white-space: nowrap;
+}
+
+.csstransforms .table-header-rotated th.rotate > div {
+  transform: translate(25px, 51px) rotate(315deg);
+  width: 30px;
+}
+
+.csstransforms .table-header-rotated th.rotate > div > span {
+  border-bottom: 1px solid #ccc;
+  padding: 5px 10px;
+}
+
+.table-header-rotated th.row-header {
+  padding: 0 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+    /* 0-000 */
+    div {
+  max-width: 40em;
+  max-height: 20em;
+  overflow: hidden;
+  position: relative;
+}
+
+table {
+  position: relative;
+  border-collapse: collapse;
+}
+
+td, th {
+  padding: 0.25em;
+}
+
+thead th {
+  position: -webkit-sticky; /* for Safari */
+  position: sticky;
+  top: 0;
+  background: #000;
+  color: #FFF;
+}
+
+thead th:first-child {
+  left: 0;
+  z-index: 1;
+}
+
+tbody th {
+  position: -webkit-sticky; /* for Safari */
+  position: sticky;
+  left: 0;
+  background: #FFF;
+  border-right: 1px solid #CCC;
+}
+</style>
+
+<table class="table table-header-rotated">
+    <cdata>%%TABLE%%</cdata>
+</table>
+
+</html>
