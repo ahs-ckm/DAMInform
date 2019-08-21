@@ -85,13 +85,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	report := ""
 
-	/* 	if getNotificationQueue(&report) {
-	   		fmt.Fprintf(w, report)
-	   	}
-	*/
 	switch r.Method {
 	case "GET":
-		//http.ServeFile(w,r)
 
 		if strings.Contains(r.URL.Path, "Notifications") {
 			if getNotificationQueue(&report) {
@@ -244,7 +239,6 @@ func getLog(report *string) bool {
 		}
 
 		tablebody += "<tr>"
-		//		tablebody += fmt.Sprintf("<th class='row-header'> %d </th>", id)
 		tablebody += fmt.Sprintf("<td>%s</td>", message)
 		tablebody += fmt.Sprintf("<td>%s</td>", focusticket)
 
@@ -450,7 +444,7 @@ func getNotificationQueue(report *string) bool {
 		tablebody += fmt.Sprintf("<td>%s</td>", jirakey)
 
 		tablebody += fmt.Sprintf("<td>%s</td>", asset)
-		tablebody += fmt.Sprintf("<td>%s</td>", created.Time.Format("2006-01-02 15:04:05")) //			 		ticket.Targetrepositoryenddate = targetrepositoryenddate.Time.Format("2006-01-02")
+		tablebody += fmt.Sprintf("<td>%s</td>", created.Time.Format("2006-01-02 15:04:05")) 
 		tablebody += fmt.Sprintf("<td>%s</td>", strconv.FormatBool(notifymgr))
 
 		tablebody += "</tr>"
@@ -510,70 +504,3 @@ func readlines2(path string) ([]string, error) {
 
 	return lines, nil
 }
-
-/* func buildOverlapFocusPage(tickets []structSingleIssue, focusTicket string, theOverlaps overlapMap) (result []string) {
-
-	var aTicket structSingleIssue
-
-	tabledef := ""
-	tableheader := ""
-	tablebody := ""
-
-	log.Println("worked....")
-
-	tableheader += "<h1>overlap report</h1><thead><tr>"
-	tableheader += "<th></th>"
-	tablebody += "<tbody>"
-	tableheader += "<th ><div><span>" + focusTicket + "</span></div></th>"
-
-	for _, aTicket = range tickets {
-
-		nCount := 0
-		key := aTicket.ID + "_" + focusTicket
-
-		nCount = strings.Count(theOverlaps[key], "~")
-		if nCount == 0 {
-			continue
-		}
-
-		tablebody += "<tr>"
-		tablebody += "<th class='row-header'>" + aTicket.ID + "</th>"
-
-		overlapAssets := strings.Split(theOverlaps[key], "~")
-		overlapDetails := ""
-
-		for _, asset := range overlapAssets {
-			if asset == "" {
-				continue
-			}
-
-			overlapDetails += "" + strings.Title(strings.Replace(string(asset), ".OET", "", -1)) + "<br>"
-		}
-
-		if (nCount) > 0 {
-
-			tablebody += fmt.Sprintf("<td>%s</td>", overlapDetails)
-
-		} else {
-			tablebody += "<td></td>"
-		}
-
-		tablebody += "</tr>"
-	}
-	tableheader += "</tr></thead>"
-
-	tablebody += "</tbody>"
-
-	tabledef = tableheader + tablebody
-
-	overlaptemplate, _ := readlines2("static/overlapfocus.html")
-
-	var line string
-	for i := range overlaptemplate {
-		line = overlaptemplate[i]
-		line = strings.Replace(line, "<cdata>%%TABLE%%</cdata>", tabledef, -1)
-		result = append(result, line)
-	}
-
-	return result
-} */
