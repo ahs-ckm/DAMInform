@@ -109,9 +109,94 @@ func handler(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, report)
 			}
 		}
+
+		if strings.Contains( strings.ToLower(r.URL.Path), strings.ToLower("StartRefresh") ){
+			refreshAssetStart( r.RequestURI ) 
+		}
+
+		if strings.Contains( strings.ToLower(r.URL.Path), strings.ToLower("EndRefresh") ){
+			refreshAssetEnd( r.RequestURI ) 
+		}
+
+
 	}
 
 }
+
+
+func refreshAssetStart(assetdef string) {
+	fmt.Println("RefreshAssetStart. Exiting. ")
+
+	assetdef = strings.Replace( strings.ToUpper(assetdef), "/STARTREFRESH,", "", 1)
+
+	splits := strings.Split(assetdef, "~")
+
+	theTemplateName := splits[0]
+	theTicket := splits[1]
+	theID := splits[2]
+
+	sqlStatement := `
+		INSERT INTO public.locktable
+		(jirakey, tablename, ident)
+		VALUES($1, $2, $3);`
+
+	_, err := db.Exec(sqlStatement, theTicket, "damasset", theID)
+
+	logMessage("Locking out "+theTemplateName+" for refresh.", theTicket, "INFO")
+
+	if err != nil {
+		if err, ok := err.(*pq.Error); ok {
+			fmt.Println("pq error:", err.Code.Name())
+			logMessage("Problems Locking out "+theTemplateName+" for refresh."+err.Detail, theTicket, "ERROR")
+		}
+	}
+
+}
+func refreshAssetEnd(assetdef string) {
+	fmt.Println("NRefreshAssetEnd. Exiting. ")
+
+	assetdef = strings.Replace( strings.ToUpper(assetdef), "/ENDREFRESH,", "", 1)
+	splits := strings.Split(assetdef, "~")
+
+	theTemplateName := splits[0]
+	theTicket := splits[1]
+	theID := splits[2]
+	
+	
+	logMessage("Refresh of "+theTemplateName+" completed, resetting modified and stale state.", theTicket, "INFO")
+	
+	sqlStatement := `update damasset set modified = false, islatest = true where UPPER(resourcemainid) = UPPER($1) and UPPER(jirakey) = UPPER($2)`
+	_, err := db.Exec(sqlStatement, theID, theTicket)
+
+	if err != nil {
+		if err, ok := err.(*pq.Error); ok {
+			fmt.Println("pq error:", err.Code.Name())
+			logMessage("Problems updating damasset state after refresh."+err.Detail, theTicket, "ERROR")
+		}
+	}
+	
+	
+	logMessage("Unlocking  "+theTemplateName+" after refresh.", theTicket, "INFO")
+
+	sqlStatement = `
+		DELETE from public.locktable
+		WHERE UPPER(jirakey) = UPPER($1) and
+			UPPER(tablename) = UPPER($2) and 
+			UPPER(ident) = UPPER($3);`
+
+	_, err = db.Exec(sqlStatement, theTicket, "damasset", theID)
+
+	if err != nil {
+		if err, ok := err.(*pq.Error); ok {
+			fmt.Println("pq error:", err.Code.Name())
+			logMessage("Problems unlocking "+theTemplateName+" after refresh."+err.Detail, theTicket, "ERROR")
+		}
+	}
+
+
+
+}
+
 
 func getLog(report *string) bool {
 
