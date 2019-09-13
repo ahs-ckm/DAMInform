@@ -87,6 +87,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
+		if strings.Contains(r.URL.Path, "/html/") {
+			fs := http.FileServer(http.Dir("./"))
+			fs.ServeHTTP(w, r)
+		}
 
 		if strings.Contains(r.URL.Path, "Notifications") {
 			if getNotificationQueue(&report) {
@@ -106,11 +110,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if strings.Contains( strings.ToLower(r.URL.Path), strings.ToLower("StartRefresh") ){
-			refreshAssetStart( r.RequestURI ) 
+			if refreshAssetStart( r.RequestURI )  {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("☄ HTTP status code returned!"))
+			} else
+			{
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("☄ HTTP status code returned!"))
+			}
 		}
 
 		if strings.Contains( strings.ToLower(r.URL.Path), strings.ToLower("EndRefresh") ){
-			refreshAssetEnd( r.RequestURI ) 
+			if refreshAssetEnd( r.RequestURI ) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("☄ HTTP status code returned!"))
+			} else
+			{
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("☄ HTTP status code returned!"))
+			}
 		}
 
 
@@ -119,8 +137,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func refreshAssetStart(assetdef string) {
-	fmt.Println("RefreshAssetStart. Exiting. ")
+func refreshAssetStart(assetdef string) bool {
+	
+	result := true
+
+	fmt.Println("BEGIN RefreshAssetStart.  ")
 
 	assetdef = strings.Replace( strings.ToUpper(assetdef), "/STARTREFRESH,", "", 1)
 
@@ -130,25 +151,34 @@ func refreshAssetStart(assetdef string) {
 	theTicket := splits[1]
 	theID := splits[2]
 
+	logerr := logMessage("Locking out "+theTemplateName+" for refresh.", theTicket, "INFO")
+	if logerr != nil {
+		fmt.Println( "DAMInform v"+ gBuild + " ERRRO when trying to log : " + logerr.Error() )
+		result = false
+	}
+
+
 	sqlStatement := `
 		INSERT INTO public.locktable
 		(jirakey, tablename, ident)
 		VALUES($1, $2, $3);`
 
 	_, err := db.Exec(sqlStatement, theTicket, "damasset", theID)
-
-	logMessage("Locking out "+theTemplateName+" for refresh.", theTicket, "INFO")
-
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			fmt.Println("pq error:", err.Code.Name())
 			logMessage("Problems Locking out "+theTemplateName+" for refresh."+err.Detail, theTicket, "ERROR")
+			result = false
 		}
 	}
+	fmt.Println("END RefreshAssetStart.  ")
 
+	return result
 }
-func refreshAssetEnd(assetdef string) {
-	fmt.Println("NRefreshAssetEnd. Exiting. ")
+func refreshAssetEnd(assetdef string) bool {
+	result := true
+	fmt.Println("BEGIN refreshAssetEnd.  ")
+	time.Sleep(5 * time.Second)
 
 	assetdef = strings.Replace( strings.ToUpper(assetdef), "/ENDREFRESH,", "", 1)
 	splits := strings.Split(assetdef, "~")
@@ -158,21 +188,30 @@ func refreshAssetEnd(assetdef string) {
 	theID := splits[2]
 	
 	
-	logMessage("Refresh of "+theTemplateName+" completed, resetting modified and stale state.", theTicket, "INFO")
+	logerr := logMessage("Refresh of "+theTemplateName+" completed, resetting modified and stale state.", theTicket, "INFO")
+	if logerr != nil {
+		fmt.Println( "DAMInform v"+ gBuild + " ERRRO when trying to log : " + logerr.Error() )
+		result = false
+	}
 	
 	sqlStatement := `update damasset set modified = false, islatest = true where UPPER(resourcemainid) = UPPER($1) and UPPER(jirakey) = UPPER($2)`
 	_, err := db.Exec(sqlStatement, theID, theTicket)
 
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
+			result = false
 			fmt.Println("pq error:", err.Code.Name())
 			logMessage("Problems updating damasset state after refresh."+err.Detail, theTicket, "ERROR")
 		}
 	}
 	
 	
-	logMessage("Unlocking  "+theTemplateName+" after refresh.", theTicket, "INFO")
-
+	logerr = logMessage("Unlocking  "+theTemplateName+" after refresh.", theTicket, "INFO")
+	if logerr != nil {
+		fmt.Println( "DAMInform v"+ gBuild + " ERRRO when trying to log : " + logerr.Error() )
+		result = false
+	}
+	
 	sqlStatement = `
 		DELETE from public.locktable
 		WHERE UPPER(jirakey) = UPPER($1) and
@@ -183,11 +222,15 @@ func refreshAssetEnd(assetdef string) {
 
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
+			result = false
 			fmt.Println("pq error:", err.Code.Name())
 			logMessage("Problems unlocking "+theTemplateName+" after refresh."+err.Detail, theTicket, "ERROR")
 		}
 	}
 
+	fmt.Println("END RefreshAssetEnd.  ")
+
+	return result
 
 
 }
@@ -283,7 +326,7 @@ func doDispatch() bool {
 	query := ""
 	theid := -1
 	result := false
-	logMessage("Doing Notification Dispatch", "", "INFO")
+	//logMessage("Doing Notification Dispatch", "", "INFO")
 
 	query = `SELECT lastnotification
 		FROM public.state;`
@@ -346,7 +389,7 @@ func doDispatch() bool {
 		m.SetHeader("To", toperson)
 
 		if notifymgr {
-			m.SetAddressHeader("Cc", "jon@beeby.ca", "coni") // change this to someone useful
+			m.SetAddressHeader("Cc", "jon@beeby.ca", "coni") //TODO: change this to someone useful
 		}
 
 		m.SetHeader("Subject", "DAM: "+thejirakey)

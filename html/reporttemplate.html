@@ -110,8 +110,19 @@ tbody th {
 }
 </style>
 
-<table class="table table-header-rotated">
+<script src="/html/TableFilter/dist/tablefilter/tablefilter.js"></script>
+
+
+<table nodeName="TABLE" class="table table-header-rotated" id="my-table" name="my-table">
     <cdata>%%TABLE%%</cdata>
 </table>
+
+<script>
+    var tf = new TableFilter("my-table", {
+        base_path: '/html/TableFilter/dist/tablefilter'
+    });
+    tf.init();
+    </script>    
+
 
 </html>
