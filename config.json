@@ -11,5 +11,7 @@
 	"TitleEmergency":		"Emergency (In Progress)",
 	"TitleBlocked"	:		"Blocked",
 	"TitleUrgent"	:		"Urgent (Blocked)",
-	"TitleNotReady"	:		"Not Yet Ready"	
+	"TitleNotReady"	:		"Not Yet Ready",
+	"SubjectPrefix" :		"[DEV] ",
+	"ManagersEmail" :		"jonbeeby@ahs.ca,jon@beeby.ca"
 }
