@@ -282,7 +282,7 @@ func fixTicket(ticket string) bool {
 		return false
 	}
 
-/* 	for a := range damassetmap {
+	/* 	for a := range damassetmap {
 
 		logMessage("INTEGRITY: Attempting to fix - Missing in filesystem (in damasset): "+a, a, "ERROR")
 		bits := strings.Split(a, "~")
@@ -370,7 +370,7 @@ func doIntegrityCheck(AssetProblem map[string]string) bool {
 				} else {
 					AssetProblem[key] = "missing in damasset"
 					fmt.Printf(sessionConfig.SubjectPrefix+"ERROR - INTEGRITY %q: Missing in damasset - ticket: %q template :%q \n", sessionConfig.ChangesetPath, ticket, asset)
-					logMessage("INTEGRITY: " + basePath + " -  Missing in damasset: "+asset, ticket, "ERROR")
+					logMessage("INTEGRITY: "+basePath+" -  Missing in damasset: "+asset, ticket, "ERROR")
 				}
 
 			}
@@ -644,9 +644,9 @@ func getWUR(report *string, Path string) bool {
 					</tr>`
 	tableheader += "</thead>"
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Order Panels")
+	tablebody += fmt.Sprintf("<td style='background-color: rgba(234, 236, 236, 0.6);font-family: Lato; text-align: center;'><b>%s</b></td>", "List of all Order Panels")
 	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
+		tablebody += "<td style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
 	}
 	tablebody += "</tr>"
 
@@ -660,7 +660,7 @@ func getWUR(report *string, Path string) bool {
 			rowspan := len(parents)
 
 			tablebody += "<tr>"
-			tablebody += fmt.Sprintf("<td rowspan='%d' width='69'>%s</td>", rowspan+1, name)
+			tablebody += fmt.Sprintf("<td rowspan='%d' width='69'>• %s</td>", rowspan+1, strings.ReplaceAll(name, ".oet", ""))
 
 			for parent := range parents {
 				parentbits := strings.Split(parents[parent], "~")
@@ -669,12 +669,37 @@ func getWUR(report *string, Path string) bool {
 				parenttitle := strings.ReplaceAll(parent, ".oet", "")
 
 				tablebody += fmt.Sprintf(`        <tr>
-					<td></td>
-					<td></td>
-					<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-					<td></td>
-					<td></td>
-					<td></td>
+					<td style=" text-align: center;">   <select>
+					<option value="dontknow">-</option>
+					<option value="yes">Yes</option>
+					<option value="no">No</option>
+				  </select></td>
+<td style=" text-align: center;">   <select>
+					  <option value="dontknow">-</option>
+					  <option value="yes">Yes</option>
+					  <option value="no">No</option>
+				  </select>
+			  	  </td>
+					<td><p>• <a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
+					<td>
+					<select>
+						<option value="dontknow">-</option>
+						<option value="yes">Yes</option>
+						<option value="no">No</option>
+					</select>
+				</td>
+<td style=" text-align: center;">   <select>
+					<option value="dontknow">-</option>
+					<option value="yes">Yes</option>
+					<option value="no">No</option>
+				</select>
+			</td>
+<td style=" text-align: center;">   <select>
+				<option value="dontknow">-</option>
+				<option value="yes">Yes</option>
+				<option value="no">No</option>
+			</select>
+		</td>
 					<td></td>
 					</tr>    `, parentcid, parenttitle)
 			}
@@ -688,9 +713,9 @@ func getWUR(report *string, Path string) bool {
 	}
 
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Smart Groups")
+	tablebody += fmt.Sprintf("<td style='background-color: rgba(234, 236, 236, 0.6);font-family: Lato;text-align: center;'><b>%s</b></td>", "List of all Smart Groups")
 	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
+		tablebody += "<td style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
 	}
 	tablebody += "</tr>"
 
@@ -707,7 +732,7 @@ func getWUR(report *string, Path string) bool {
 
 			tablebody += "<tr>"
 			if len(parents) > 0 {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", rowspan+1, name)
+				tablebody += fmt.Sprintf("<td style='font-family:Lato;' rowspan='%d'>• %s</td>", rowspan+1, strings.ReplaceAll(name, ".oet", ""))
 
 				for parent := range parents {
 					parentbits := strings.Split(parents[parent], "~")
@@ -716,21 +741,55 @@ func getWUR(report *string, Path string) bool {
 					parenttitle := strings.ReplaceAll(parent, ".oet", "")
 
 					tablebody += fmt.Sprintf(`        <tr>
-						<td></td>
-						<td></td>
-						<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-						<td></td>
-						<td></td>
-						<td></td>
+						<td style=" text-align: center;">   <select>
+						<option value="dontknow">-</option>
+						<option value="yes">Yes</option>
+						<option value="no">No</option>
+					  </select></td>
+<td style=" text-align: center;">   <select>
+						  <option value="dontknow">-</option>
+						  <option value="yes">Yes</option>
+						  <option value="no">No</option>
+					  </select>
+				  </td>
+						<td><p>• <a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
 						<td></td>
 						</tr>    `, parentcid, parenttitle)
 				}
 			} else {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", 2, name)
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", 2, strings.ReplaceAll(name, ".oet", ""))
 
 				tablebody += `        <tr>
-						<td></td>
-						<td></td>
+<td style=" text-align: center;">   <select>
+					<option value="dontknow">-</option>
+					<option value="yes">Yes</option>
+					<option value="no">No</option>
+				</select>
+			</td>
+<td style=" text-align: center;">   <select>
+				<option value="dontknow">-</option>
+				<option value="yes">Yes</option>
+				<option value="no">No</option>
+			</select>
+		</td>
 						<td><p>[ none ]</p></td>
 						<td></td>
 						<td></td>
@@ -748,9 +807,9 @@ func getWUR(report *string, Path string) bool {
 	}
 
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Order Sets")
+	tablebody += fmt.Sprintf("<td style='background-color: rgba(234, 236, 236, 0.6);text-align: center;'><b>%s</b></td>", "List of all Order Sets")
 	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
+		tablebody += "<td style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
 	}
 	tablebody += "</tr>"
 	if len(ordersets) > 0 {
@@ -765,7 +824,7 @@ func getWUR(report *string, Path string) bool {
 			tablebody += "<tr>"
 
 			if len(parents) > 0 {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", rowspan+1, name)
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", rowspan+1, strings.ReplaceAll(name, ".oet", ""))
 
 				for parent := range parents {
 					parentbits := strings.Split(parents[parent], "~")
@@ -774,21 +833,54 @@ func getWUR(report *string, Path string) bool {
 					parenttitle := strings.ReplaceAll(parent, ".oet", "")
 
 					tablebody += fmt.Sprintf(`        <tr>
-						<td></td>
-						<td></td>
-						<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-						<td></td>
-						<td></td>
-						<td></td>
+						<td style=" text-align: center;">   <select>
+						<option value="dontknow">-</option>
+						<option value="yes">Yes</option>
+						<option value="no">No</option>
+					  </select></td>
+<td style=" text-align: center;">   <select>
+						  <option value="dontknow">-</option>
+						  <option value="yes">Yes</option>
+						  <option value="no">No</option>
+					  </select>
+				  </td>
+						<td><p>• <a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
 						<td></td>
 						</tr>    `, parentcid, parenttitle)
 				}
 			} else {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", 2, name)
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", 2, strings.ReplaceAll(name, ".oet", ""))
 
 				tablebody += `        <tr>
-						<td></td>
-						<td></td>
+						<td style=" text-align: center;">   <select>
+						<option value="dontknow">-</option>
+						<option value="yes">Yes</option>
+						<option value="no">No</option>
+					  </select></td>
+<td style=" text-align: center;">   <select>
+						  <option value="dontknow">-</option>
+						  <option value="yes">Yes</option>
+						  <option value="no">No</option>
+					  </select>
+				  </td>
 						<td><p>[ none ]</p></td>
 						<td></td>
 						<td></td>
@@ -807,9 +899,9 @@ func getWUR(report *string, Path string) bool {
 	}
 
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all others")
+	tablebody += fmt.Sprintf("<td style='background-color: rgba(234, 236, 236, 0.6);text-align: center;'><b>%s</b></td>", "List of all others")
 	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
+		tablebody += "<td style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
 	}
 	tablebody += "</tr>"
 	if len(others) > 0 {
@@ -824,7 +916,7 @@ func getWUR(report *string, Path string) bool {
 			tablebody += "<tr>"
 
 			if len(parents) > 0 {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", rowspan+1, name)
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", rowspan+1, strings.ReplaceAll(name, ".oet", ""))
 
 				for parent := range parents {
 					parentbits := strings.Split(parents[parent], "~")
@@ -833,21 +925,57 @@ func getWUR(report *string, Path string) bool {
 					parenttitle := strings.ReplaceAll(parent, ".oet", "")
 
 					tablebody += fmt.Sprintf(`        <tr>
-						<td></td>
-						<td></td>
-						<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-						<td></td>
-						<td></td>
-						<td></td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+
+						<td><p>• <a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
+<td style=" text-align: center;">   <select>
+								<option value="dontknow">-</option>
+								<option value="yes">Yes</option>
+								<option value="no">No</option>
+							</select>
+						</td>
 						<td></td>
 						</tr>    `, parentcid, parenttitle)
 				}
 			} else {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", 2, name)
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", 2, strings.ReplaceAll(name, ".oet", ""))
 
 				tablebody += `        <tr>
-						<td></td>
-						<td></td>
+						<td style=" text-align: center;">   <select>
+						<option value="dontknow">-</option>
+						<option value="yes">Yes</option>
+						<option value="no">No</option>
+					  </select></td>
+<td style=" text-align: center;">   <select>
+						  <option value="dontknow">-</option>
+						  <option value="yes">Yes</option>
+						  <option value="no">No</option>
+					  </select>
+				  </td>
 						<td><p>[ none ]</p></td>
 						<td></td>
 						<td></td>
@@ -866,9 +994,9 @@ func getWUR(report *string, Path string) bool {
 	}
 
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Order Sets (not via a group, directly embedded)")
+	tablebody += fmt.Sprintf("<td style='background-color: rgba(234, 236, 236, 0.6);;'><b>%s</b></td>", "List of all Order Sets (not via a group, directly embedded)")
 	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
+		tablebody += "<td style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
 	}
 	tablebody += "</tr>"
 
