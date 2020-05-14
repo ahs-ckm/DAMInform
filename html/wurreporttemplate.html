@@ -1,6 +1,9 @@
 <html>
 <head>
 <!--     <link href="/stylesheets/overlap.css" rel="stylesheet/css" type="text/css"> -->
+<script src="/html/tableToExcel/tableToExcel.js">
+</script>
+<title>WUR - %%ASSETNAME%%</title>
 
 </head>
 <style>
@@ -10,12 +13,12 @@
   display: inline-block;
   /* border-bottom: 1px dotted black;  *//* If you want dots under the hoverable text */
 }
-@font-face {
+/* @font-face {
     font-family: 'Lato-Light';
     src: url('fonts/Lato-Light.eot'), url('fonts/Lato-Light.ttf') format('truetype'), url('fonts/Lato-Light.svg') format('svg');
     font-weight: normal;
     font-style: normal;
-}
+} */
 /* Tooltip text */
 .tooltip .tooltiptext {
   visibility: hidden;
@@ -117,27 +120,20 @@ tbody th {
   border-right: 1px solid #aaa;
 }
 </style>
-
+<button id="button-excel">Export Spreadsheet</button>
 
 <script>
-var tableToExcel = (function() {
-  var uri = 'data:application/vnd.ms-excel;base64,'
-    , template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><?xml version="1.0" encoding="UTF-8" standalone="yes"?><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>'
-    , base64 = function(s) { return window.btoa(unescape(encodeURIComponent(s))) }
-    , format = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
-  return function(table, name) {
-      if (!table.nodeType) table = document.getElementById(table);
-      var ctx = { worksheet: name || 'Worksheet', table: table.innerHTML };
-    window.location.href = uri + base64(format(template, ctx));
-    document.getElementById("exel").download = "wur.xls";    
-  };
-})();
 
+
+let button = document.querySelector("#button-excel");
+
+<cdata>%%EXPORT%%</cdata>
 </script>
 
-<table nodeName="TABLE" class="table table-header-rotated" id="my-table" name="my-table">
+
+<table nodeName="TABLE" class="table table-header-rotated" id="my-table" name="my-table" data-cols-width="77,13,75,13,13,20">
     <cdata>%%TABLE%%</cdata>
 </table>
-<a href="#" class="" id="exel" onclick="tableToExcel('my-table', 'name', 'result.xls')"><img style="width:50px;height:50px;" alt ="Export Excel" src="http://www.iconarchive.com/download/i86104/graphicloads/filetype/excel-xls.ico"/></a>
+
 
 </html>
