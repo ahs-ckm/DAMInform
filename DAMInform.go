@@ -27,6 +27,8 @@ var db *sql.DB                      // db connection
 var sessionConfig = configuration{} // runtime config
 var gBuild string
 
+const cRELEASEDVERSIONSUFFIX = " [Released asset]"
+
 // holds the config, populated from config.json
 type configuration struct {
 	DBhost            string
@@ -129,6 +131,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if strings.Contains(r.URL.Path, "FixTicket") {
+
+			params := strings.Split(r.RequestURI, ",")
+
+			if len(params) < 1 {
+				return
+			}
+
+			ticketToFix := strings.Trim(params[1], "/") // operation type
+
+			if fixTicket(ticketToFix) {
+				w.WriteHeader(http.StatusOK)
+
+			} else {
+				w.WriteHeader(http.StatusTeapot)
+
+			}
+		}
+
 		if strings.Contains(r.URL.Path, "IntegrityCheck") {
 
 			assetProblem := make(map[string]string)
@@ -141,7 +162,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
+/* 
 		if strings.Contains(strings.ToLower(r.URL.Path), strings.ToLower("StartRefresh")) {
 			if refreshAssetStart(r.RequestURI) {
 				w.WriteHeader(http.StatusOK)
@@ -160,30 +181,28 @@ func handler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte("☄ HTTP status code returned!"))
 			}
-		}
+		} */
 
 	}
 
 }
 
-func testDirectoryMonitoring( path string ) bool {
+func testDirectoryMonitoring(path string) bool {
 
 	// create a test file in each folder then query activity table for corresponding records
-	
 
 	return true
 }
 
-func doIntegrityCheck(AssetProblem map[string]string) bool {
+func fixTicket(ticket string) bool {
 
-	// for each ticket
+	logMessage("INTEGRITY: fixTicket() called", ticket, "INFO")
 
 	subDirToSkip := "downloads"
 	basePath := sessionConfig.ChangesetPath
-
 	damassetmap := make(map[string]string)
 
-	query := `SELECT jirakey, filename, fullfilepath
+	query := `SELECT folder, filename, fullfilepath
 			FROM public.damasset`
 
 	rows, err := db.Query(query)
@@ -194,20 +213,20 @@ func doIntegrityCheck(AssetProblem map[string]string) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		jirakey := ""
+		folder := ""
 		filename := ""
 		fullfilepath := ""
 
 		err = rows.Scan(
-			&jirakey,
+			&folder,
 			&filename,
 			&fullfilepath,
 		)
 
-		damassetmap[jirakey+"~"+filename] = fullfilepath
+		damassetmap[folder+"~"+filename] = fullfilepath
 	}
 
-	err = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(basePath+"/"+ticket, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
 			return err
@@ -225,14 +244,8 @@ func doIntegrityCheck(AssetProblem map[string]string) bool {
 
 			results := strings.Split(relpath, "/")
 			if len(results) > 0 {
-/* 				ticket := strings.ToLower(results[0])
-				asset := strings.ToLower(filepath.Base(relpath))
- */
 				ticket := results[0]
 				asset := filepath.Base(relpath)
-
-
-				//fmt.Printf("ticket: %q template :%q \n",  ticket, asset )
 				key := ticket + "~" + asset
 
 				// either the file is in damasset or it isn't
@@ -241,19 +254,17 @@ func doIntegrityCheck(AssetProblem map[string]string) bool {
 					// so asset can be removed from map.
 					delete(damassetmap, key)
 				} else {
-					AssetProblem[key] = "missing in damasset"
-					fmt.Printf(sessionConfig.SubjectPrefix + "ERROR - INTEGRITY: Missing in damasset - ticket: %q template :%q \n", ticket, asset)
-					logMessage("INTEGRITY: Missing in damasset: "+asset, ticket, "ERROR")
-					logMessage("INTEGRITY: Attempting to fix - Missing in damasset: "+asset, ticket, "ERROR")					
+					logMessage("INTEGRITY: Attempting to fix - Missing in damasset: "+asset, ticket, "ERROR")
 
-					sqlStatement := `INSERT INTO public.activity
-					(filename, operation, directory, "time")
-					VALUES($1, $2, $3, 0);`
+					sqlStatement := `INSERT INTO public.activity_local
+					(filename, operation, directory, "time", optime)
+					VALUES($1, $2, $3, 0, $4);`
 
 					_, err = db.Exec(sqlStatement,
 						asset,
 						"MODIFY",
 						filepath.Dir(path),
+						time.Now(),
 					)
 
 					if err, ok := err.(*pq.Error); ok {
@@ -273,29 +284,89 @@ func doIntegrityCheck(AssetProblem map[string]string) bool {
 		return false
 	}
 
-	for a := range damassetmap {
-		AssetProblem[a] = "in damasset, not in filesystem"
-		fmt.Printf( sessionConfig.SubjectPrefix + "ERROR - INTEGRITY: Missing in filesystem (in damasset) - %q \n", a)
-		logMessage("INTEGRITY: Missing in filesystem (in damasset)", a, "ERROR")
-		logMessage("INTEGRITY: Attempting to fix - Missing in filesystem (in damasset): " +a, a, "ERROR")			
-		bits := strings.Split( a, "~")
+	return true
+}
 
-		asset := bits[1]
-		directory := strings.ReplaceAll( damassetmap[a],  asset, "" )
-		directory = strings.ReplaceAll( directory, "\\", "/" )
- 		sqlStatement := `INSERT INTO public.activity
-		(filename, operation, directory, "time")
-		VALUES($1, $2, $3, 0);`
+func doIntegrityCheck(AssetProblem map[string]string) bool {
 
-		_, err = db.Exec(sqlStatement,
-			asset,
-			"DELETE",
-			directory,
+	// for each ticket
+
+	subDirToSkip := "downloads"
+	basePath := sessionConfig.ChangesetPath
+
+	damassetmap := make(map[string]string)
+
+	query := `SELECT folder, filename, fullfilepath
+			FROM public.damasset`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Println(err.Error())
+		return false
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		folder := ""
+		filename := ""
+		fullfilepath := ""
+
+		err = rows.Scan(
+			&folder,
+			&filename,
+			&fullfilepath,
 		)
 
-		if err, ok := err.(*pq.Error); ok {
-			logMessage("pq error:"+err.Code.Name()+" - "+err.Message, "", "ERROR")
+		damassetmap[folder+"~"+filename] = fullfilepath
+	}
+
+	err = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			return err
 		}
+		if info.IsDir() && info.Name() == subDirToSkip {
+			return filepath.SkipDir
+		}
+
+		if strings.HasSuffix(path, ".oet") {
+			relpath, err := filepath.Rel(basePath, path)
+			if err != nil {
+				return err
+			}
+
+			results := strings.Split(relpath, "/")
+			if len(results) > 0 {
+				ticket := results[0]
+				asset := filepath.Base(relpath)
+				key := ticket + "~" + asset
+
+				// either the file is in damasset or it isn't
+				if _, ok := damassetmap[key]; ok {
+					// asset exists in damassets and in filesystem
+					// so asset can be removed from map.
+					delete(damassetmap, key)
+				} else {
+					AssetProblem[key] = "missing in damasset"
+					fmt.Printf(sessionConfig.SubjectPrefix+"ERROR - INTEGRITY %q: Missing in damasset - ticket: %q template :%q \n", sessionConfig.ChangesetPath, ticket, asset)
+					logMessage("INTEGRITY: "+basePath+" -  Missing in damasset: "+asset, ticket, "ERROR")
+				}
+
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("error walking the path %q: %v\n", basePath, err)
+		return false
+	}
+
+	for a := range damassetmap {
+		AssetProblem[a] = "in damasset, not in filesystem"
+		fmt.Printf(sessionConfig.SubjectPrefix+"ERROR - INTEGRITY %q: Missing in filesystem (in damasset) - %q \n", sessionConfig.ChangesetPath, a)
+		logMessage("INTEGRITY: Missing in filesystem (in damasset) : "+sessionConfig.ChangesetPath, a, "ERROR")
+
 	}
 
 	if len(AssetProblem) > 0 {
@@ -323,7 +394,7 @@ func doIntegrityCheck(AssetProblem map[string]string) bool {
 
 	return true
 }
-
+/* 
 func refreshAssetStart(assetdef string) bool {
 
 	result := true
@@ -335,10 +406,10 @@ func refreshAssetStart(assetdef string) bool {
 	splits := strings.Split(assetdef, "~")
 
 	theTemplateName := splits[0]
-	theTicket := splits[1]
+	theFolder := splits[1]
 	theID := splits[2]
 
-	logerr := logMessage("Locking out "+theTemplateName+" for refresh.", theTicket, "INFO")
+	logerr := logMessage("Locking out "+theTemplateName+" for refresh.", theFolder, "INFO")
 	if logerr != nil {
 		fmt.Println("DAMInform v" + gBuild + " ERRRO when trying to log : " + logerr.Error())
 		result = false
@@ -346,14 +417,14 @@ func refreshAssetStart(assetdef string) bool {
 
 	sqlStatement := `
 		INSERT INTO public.locktable
-		(jirakey, tablename, ident)
+		(folder, tablename, ident)
 		VALUES($1, $2, $3);`
 
-	_, err := db.Exec(sqlStatement, theTicket, "damasset", theID)
+	_, err := db.Exec(sqlStatement, theFolder, "damasset", theID)
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			fmt.Println("pq error:", err.Code.Name())
-			logMessage("Problems Locking out "+theTemplateName+" for refresh."+err.Detail, theTicket, "ERROR")
+			logMessage("Problems Locking out "+theTemplateName+" for refresh."+err.Detail, theFolder, "ERROR")
 			result = false
 		}
 	}
@@ -370,27 +441,27 @@ func refreshAssetEnd(assetdef string) bool {
 	splits := strings.Split(assetdef, "~")
 
 	theTemplateName := splits[0]
-	theTicket := splits[1]
+	theFolder := splits[1]
 	theID := splits[2]
 
-	logerr := logMessage("Refresh of "+theTemplateName+" completed, resetting modified and stale state.", theTicket, "INFO")
+	logerr := logMessage("Refresh of "+theTemplateName+" completed, resetting modified and stale state.", theFolder, "INFO")
 	if logerr != nil {
 		fmt.Println("DAMInform v" + gBuild + " ERRRO when trying to log : " + logerr.Error())
 		result = false
 	}
 
-	sqlStatement := `update damasset set modified = false, islatest = true where UPPER(resourcemainid) = UPPER($1) and UPPER(jirakey) = UPPER($2)`
-	_, err := db.Exec(sqlStatement, theID, theTicket)
+	sqlStatement := `update damasset set modified = false, islatest = true where UPPER(resourcemainid) = UPPER($1) and UPPER(folder) = UPPER($2)`
+	_, err := db.Exec(sqlStatement, theID, theFolder)
 
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			result = false
 			fmt.Println("pq error:", err.Code.Name())
-			logMessage("Problems updating damasset state after refresh."+err.Detail, theTicket, "ERROR")
+			logMessage("Problems updating damasset state after refresh."+err.Detail, theFolder, "ERROR")
 		}
 	}
 
-	logerr = logMessage("Unlocking  "+theTemplateName+" after refresh.", theTicket, "INFO")
+	logerr = logMessage("Unlocking  "+theTemplateName+" after refresh.", theFolder, "INFO")
 	if logerr != nil {
 		fmt.Println("DAMInform v" + gBuild + " ERRRO when trying to log : " + logerr.Error())
 		result = false
@@ -398,17 +469,17 @@ func refreshAssetEnd(assetdef string) bool {
 
 	sqlStatement = `
 		DELETE from public.locktable
-		WHERE UPPER(jirakey) = UPPER($1) and
+		WHERE UPPER(folder) = UPPER($1) and
 			UPPER(tablename) = UPPER($2) and 
 			UPPER(ident) = UPPER($3);`
 
-	_, err = db.Exec(sqlStatement, theTicket, "damasset", theID)
+	_, err = db.Exec(sqlStatement, theFolder, "damasset", theID)
 
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			result = false
 			fmt.Println("pq error:", err.Code.Name())
-			logMessage("Problems unlocking "+theTemplateName+" after refresh."+err.Detail, theTicket, "ERROR")
+			logMessage("Problems unlocking "+theTemplateName+" after refresh."+err.Detail, theFolder, "ERROR")
 		}
 	}
 
@@ -416,7 +487,7 @@ func refreshAssetEnd(assetdef string) bool {
 
 	return result
 
-}
+} */
 
 func getParents(assetID string) map[string]string {
 
@@ -424,17 +495,12 @@ func getParents(assetID string) map[string]string {
 
 	m = make(map[string]string)
 
-/* 	query := `select ms_p.name, templateid 
-	from public.mirrorstate ms_p, public.mirrorstate_embedded emb
-	where emb.parentid = templateid
-	and childid = $1`
- */	
- 	query := ` select ms_p.name, templateid, c.cid
-	 from public.mirrorstate_embedded emb
-	 left join ckmresource c on emb.parentid = c.resourcemainid
-	 inner join public.mirrorstate ms_p on ms_p.templateid = emb.parentid
-			and childid = $1 order by 1 asc`
- 
+	query := ` select ms_p.name, templateid, c.cid, rels.isReleased
+	 from public.mirrorstate_relationships rels
+	 left join ckmresource c on rels.parentid = c.resourcemainid
+	 inner join public.mirrorstate ms_p on ms_p.templateid = rels.parentid
+			and childid = $1 order by 1 desc`
+
 	rows, err := db.Query(query, assetID)
 	if err != nil {
 		log.Println(err.Error())
@@ -446,18 +512,85 @@ func getParents(assetID string) map[string]string {
 		parentname := ""
 		parentid := ""
 		parentcid := ""
+		isReleasedRelationship := false
 		err = rows.Scan(
 			&parentname,
 			&parentid,
 			&parentcid,
+			&isReleasedRelationship,
 		)
 
-		m[parentname] = parentid+"~"+parentcid
+		if isReleasedRelationship {
+			parentname += cRELEASEDVERSIONSUFFIX
+		}
+
+		m[parentname] = parentid + "~" + parentcid
 
 	}
 
 	return m
 
+}
+
+func addParentRow(parentcid, parenttitle string) string {
+
+
+	return fmt.Sprintf(`        <tr>
+	<td  style=" text-align: center;">   
+	<select>
+		<option value="dontknow">-</option>
+		<option value="yes">Yes</option>
+		<option value="no">No</option>
+	  </select>
+	</td>
+	<td data-hyperlink="https://ahsckm.ca/#showTemplate_%s" ><p>• <a  target="_blank" href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
+	<td    style=" text-align: center;">   
+		<select>
+			<option value="dontknow">-</option>
+			<option value="yes">Yes</option>
+			<option value="no">No</option>
+		</select>
+	</td>
+	<td  style=" text-align: center;">   
+	<select>
+		<option value="dontknow">-</option>
+		<option value="yes">Yes</option>
+		<option value="no">No</option>
+	</select>
+	</td>
+	<td  ></td>
+	</tr>    `, parentcid, parentcid, parenttitle)
+
+}
+
+func addParentRowNone() string {
+	return `
+	<tr>
+		<td    style=" text-align: center;">   
+			<select>
+				<option value="dontknow">-</option>
+				<option value="yes">Yes</option>
+				<option value="no">No</option>
+			</select>
+		</td>
+		<td   ><p>[ none ]</p></td>
+		<td   ></td>
+		<td   ></td>		
+		<td   ></td>		
+	</tr>    `
+
+}
+
+func addSection(name string, columnnumber int) string {
+	tablebody := ""
+
+	tablebody += fmt.Sprintf("<td data-fill-color='eaecec' data-height='25' data-f-bold='true'  data-a-h='center' style='background-color: rgba(234, 236, 236, 0.6);font-family: Lato; text-align: center;'><b>%s</b></td>", name)
+
+	for i := 0; i < columnnumber; i++ {
+		tablebody += "<td data-fill-color='eaecec' style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
+	}
+
+	return tablebody
 }
 
 func getWUR(report *string, Path string) bool {
@@ -470,24 +603,42 @@ func getWUR(report *string, Path string) bool {
 
 	fmt.Println("DAMInform : getWUR() " + assetID)
 
-	/* query := `select distinct ms_p.name, templateid 
-	from public.mirrorstate ms_p, public.mirrorstate_embedded emb
-	where emb.parentid = templateid
-	and childid = $1`
- */
-	query := `select distinct ms_p.name, ms_p.templateid, ms_c."name" as childname 
-	from public.mirrorstate ms_p, public.mirrorstate_embedded emb, public.mirrorstate ms_c
-	where emb.parentid = ms_p.templateid
-	and childid = ms_c.templateid	
-	and childid = $1 order by 1 asc`
+	
+	rows, err := db.Query("select resourcemaindisplayname from ckmresource c where resourcemainid = $1", assetID)
+	if err != nil {
+		log.Println(err.Error())
+		return false
+	}
+	defer rows.Close()
+
+	assetdisplayname := ""
+
+	for rows.Next() {
+
+		err = rows.Scan(
+			&assetdisplayname,
+		)
+
+		if err != nil {
+			log.Println(err.Error())
+			return false
+		}		
+	}
+
+	query :=`select distinct ms_p.filename, ms_p.templateid, ms_c.filename as childname, rels.isReleased, ms_p.cid
+		from public.mirrorstate ms_p, public.mirrorstate_relationships rels, public.mirrorstate ms_c
+		where rels.parentid = ms_p.templateid
+		and childid = ms_c.templateid  
+		and childid = $1 order by 1 asc`
 
 	tabledef := ""
 	tableheader := ""
 	tablebody := ""
+	columnnumber := 5
 
 	log.Println("DAMInform.getWUR() ....")
 
-	rows, err := db.Query(query, assetID)
+	rows, err = db.Query(query, assetID)
 	if err != nil {
 		log.Println(err.Error())
 		return false
@@ -497,18 +648,23 @@ func getWUR(report *string, Path string) bool {
 	orderpanels := []string{}
 	ordersets := []string{}
 	smartgroups := []string{}
-	others := []string{}	
+	others := []string{}
 	childname := ""
+	isReleasedRelationship := false
 
 	for rows.Next() {
 		parentname := ""
 		parentid := ""
-			
+		parentcid := []byte("") // declared this way to handle null values in Scan() 
+
+		//var parentcidnullable sql.NullString 
 
 		err = rows.Scan(
 			&parentname,
 			&parentid,
 			&childname,
+			&isReleasedRelationship,
+			&parentcid,
 		)
 
 		if err != nil {
@@ -516,198 +672,165 @@ func getWUR(report *string, Path string) bool {
 			return false
 		}
 
-		if strings.Contains(strings.ToLower(parentname), "order panel") {
+		if isReleasedRelationship {
+			parentname += cRELEASEDVERSIONSUFFIX
+		}
+	
+/* 		if parentcidnullable.Valid {
+			parentcid, _ = parentcidnullable.Value()
+		}
+
+ */		if strings.Contains(strings.ToLower(parentname), "order panel") {
 			// add to the panel list
-			orderpanels = append(orderpanels, parentname + "~" + parentid)
+			orderpanels = append(orderpanels, parentname+"~"+parentid+"~"+string(parentcid))
 		} else {
 			if strings.Contains(strings.ToLower(parentname), "smart group") {
 				// add to the panel list
-				smartgroups = append(smartgroups, parentname+ "~" + parentid)
+				smartgroups = append(smartgroups, parentname+"~"+parentid+"~"+string(parentcid))
 			} else {
 				if strings.Contains(strings.ToLower(parentname), "order set") {
 					// add to the panel list
-					ordersets = append(ordersets, parentname+ "~" + parentid)
+					ordersets = append(ordersets, parentname+"~"+parentid+"~"+string(parentcid))
 				} else {
 					// randoms
-					others = append(others, parentname+ "~" + parentid)
+					others = append(others, parentname+"~"+parentid+"~"+string(parentcid))
 				}
 			}
-		
+
 		}
 
+	}
+	theTime := fmt.Sprintf("%s", time.Now().Format("Mon Jan _2 2006 @ 15:04"))
+	tableheader += "<thead>" +
+				"<tr>" +
+				"<td style='font-size: x-large; border-top-color: white; border-left: white; border-right: white;' data-f-sz='22'><img width='64' height='64' src='html/AHS-logo.jpg'>" + assetdisplayname + "</b></td>" + 
+				"<td style='border-top-color: white; border-left: white; border-right: white;' data-f-sz='22'>" + "</td>" + 								
+				"<td style='vertical-align: bottom; border-top-color: white; border-left: white; border-right: white;'>Where Used Report - " + theTime + "</td>" +
+				"<td style='border-top-color: white; border-left: white; border-right: white;' data-f-sz='22'>" + "</td>" + 
+				"<td style='border-top-color: white; border-left: white; border-right: white;' data-f-sz='22'>" + "</td>" + 
+				"<td style='vertical-align: bottom; border-top-color: white; border-left: white; border-right: white;' data-a-wrap='true'>Clinical Knowledge<br>& Content Management</td>" + 				
+				"</tr>"
 
-	}
-	theTime := fmt.Sprintf("%s", time.Now().Format("Mon Jan _2 15:04 2006"))
-	tableheader += "<h4>Where Used Report. " + theTime + "</h4><h1>" + strings.ReplaceAll(childname, ".oet", "") + "</h1>  <thead> <tr>"
-//	tableheader += fmt.Sprintf("<th style='font-weight: normal;'>%s</th></tr>", time.Now().Format("Mon Jan _2 15:04:05 2006"))
+	tableheader += fmt.Sprintf( `<tr style='background: aliceblue;'>
+						<td data-fill-color="D8E8F0" data-f-bold='true'><b>Assets containing %s </b></td>
+						<td data-fill-color="D8E8F0" data-a-h="center" data-a-h="center" data-a-wrap="true"data-f-bold='true'><b>To be Updated?</b></td>
+						<td data-fill-color="D8E8F0" data-a-h="center"  data-a-wrap="true" data-f-bold='true'><b>Assets where the listed Panel or Smart Group is Embedded</b></td>
+						<td data-fill-color="D8E8F0"  data-a-h="center" data-a-wrap="true" data-f-bold='true'><b>To be Updated?</b></td>
+						<td data-fill-color="D8E8F0"  data-a-h="center" data-a-wrap="true" data-f-bold='true'><b>Task Complete?</b></td>
+						<td data-fill-color="D8E8F0" data-a-h="center"  data-f-bold='true'><b>Comments</b></td>
+					</td></tr>`, assetdisplayname )
+
 	tablebody += "<tbody>"
-	//	tableheader += "<th ><div><span>" + "" + "</span></div></th>"
-	tableheader += `<tr>
-						<th>Templates the Important Asset is Embedded in</th>
-						<th>To be Updated</th>
-						<th>Not to be Updated</th>
-						<th>List of links to CKM Templates where the listed Panel or Smart Groups is Embedded</th>
-						<th>To be Updated</th>
-						<th>Not to be Updated</th>
-						<th>Task Complete?</th>
-						<th>Comments</th>
-					</tr>`
-	tableheader += "</thead>"
-	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Order Panels")
-	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
-	}
+	// ------------------------------------------ ORDER PANELS --------------------------------------------------------
+	tablebody += "<tr data-height='20' >"
+	tablebody += addSection("List of all Order Panels", columnnumber)
 	tablebody += "</tr>"
 
 	if len(orderpanels) > 0 {
 		for i := range orderpanels {
-			bits := strings.Split( orderpanels[i], "~")
+			bits := strings.Split(orderpanels[i], "~")
 			name := bits[0]
 			id := bits[1]
-			parents := getParents( id )
+			childcid := bits[2]
 
+			parents := getParents(id)
 			rowspan := len(parents)
 
 			tablebody += "<tr>"
-			tablebody += fmt.Sprintf("<td rowspan='%d' width='69'>%s</td>", rowspan + 1, name)
+			if len(parents) > 0 {
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a target='_blank' href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", rowspan+1, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
 
-			for parent := range(parents) {
-				parentbits := strings.Split( parents[parent], "~")
-				parentcid := parentbits[1]			
-				//parentname := parentbits[0]			
-				parenttitle := strings.ReplaceAll(parent, ".oet", "")
+				for parent := range parents {
+					parentbits := strings.Split(parents[parent], "~")
+					parentcid := parentbits[1]
+					parenttitle := strings.ReplaceAll(parent, ".oet", "")
 
-				tablebody += fmt.Sprintf( `        <tr>
-					<td></td>
-					<td></td>
-					<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					</tr>    `, parentcid, parenttitle )
+					tablebody += addParentRow(parentcid, parenttitle)
+				}
+			} else {
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a  target='_blank' href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", 2, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
+				tablebody += addParentRowNone()
 			}
 
+			tablebody += "</tr>"
 		}
 	} else {
 		tablebody += "<tr>"
-		tablebody += fmt.Sprintf("<td>%s</td>", "[ none ]")
+		tablebody += fmt.Sprintf("<td  >%s</td>", "[ none ]")
 		tablebody += "</tr>"
 
 	}
 
+	// ------------------------------------------ SMART GROUPS --------------------------------------------------------
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Smart Groups")
-	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
-	}
+	tablebody += addSection("List of all Smart Groups", columnnumber)
 	tablebody += "</tr>"
 
 	if len(smartgroups) > 0 {
 
 		for i := range smartgroups {
-			bits := strings.Split( smartgroups[i], "~")
+			bits := strings.Split(smartgroups[i], "~")
 			name := bits[0]
 			id := bits[1]
+			childcid := bits[2]			
+			parents := getParents(id)
 
-			parents := getParents( id )
-		
 			rowspan := len(parents)
 
 			tablebody += "<tr>"
 			if len(parents) > 0 {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", rowspan + 1, name)
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a target='_blank'  href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", rowspan+1, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
 
-				for parent := range(parents) {
-					parentbits := strings.Split( parents[parent], "~")
-					parentcid := parentbits[1]			
-					//parentname := parentbits[0]			
+				for parent := range parents {
+					parentbits := strings.Split(parents[parent], "~")
+					parentcid := parentbits[1]
 					parenttitle := strings.ReplaceAll(parent, ".oet", "")
-	
-					tablebody += fmt.Sprintf( `        <tr>
-						<td></td>
-						<td></td>
-						<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						</tr>    `, parentcid, parenttitle )
+
+					tablebody += addParentRow(parentcid, parenttitle)
 				}
 			} else {
-					tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", 2, name)
-
-					tablebody += `        <tr>
-						<td></td>
-						<td></td>
-						<td><p>[ none ]</p></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						</tr>    `
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a target='_blank'  href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", 2, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
+				tablebody += addParentRowNone()
 			}
-
 
 			tablebody += "</tr>"
 		}
 	} else {
 		tablebody += "<tr>"
-		tablebody += fmt.Sprintf("<td>%s</td>", "[ none ]")
+		tablebody += fmt.Sprintf("<td   >%s</td>", "[ none ]")
 		tablebody += "</tr>"
 	}
-
+	// ------------------------------------------ ORDER SETS --------------------------------------------------------
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Order Sets")
-	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
-	}
+	tablebody += addSection("List of all Order Sets", columnnumber)
 	tablebody += "</tr>"
+
 	if len(ordersets) > 0 {
 		for i := range ordersets {
-			bits := strings.Split( ordersets[i], "~")
+			bits := strings.Split(ordersets[i], "~")
 			name := bits[0]
 			id := bits[1]
-			parents := getParents( id )
-
+			parents := getParents(id)
+			childcid := bits[2]						
 			rowspan := len(parents)
 
 			tablebody += "<tr>"
 
-
 			if len(parents) > 0 {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", rowspan + 1, name)
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a target='_blank'  href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", rowspan+1, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
 
-				for parent := range(parents) {
-					parentbits := strings.Split( parents[parent], "~")
-					parentcid := parentbits[1]			
-					//parentname := parentbits[0]			
+				for parent := range parents {
+					parentbits := strings.Split(parents[parent], "~")
+					parentcid := parentbits[1]
 					parenttitle := strings.ReplaceAll(parent, ".oet", "")
-	
-					tablebody += fmt.Sprintf( `        <tr>
-						<td></td>
-						<td></td>
-						<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						</tr>    `, parentcid, parenttitle )
+
+					tablebody += addParentRow(parentcid, parenttitle)
 				}
 			} else {
-					tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", 2, name)
-
-					tablebody += `        <tr>
-						<td></td>
-						<td></td>
-						<td><p>[ none ]</p></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						</tr>    `
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a  target='_blank' href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", 2, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
+				tablebody += addParentRowNone()
 			}
+
 
 
 			tablebody += "</tr>"
@@ -718,59 +841,51 @@ func getWUR(report *string, Path string) bool {
 		tablebody += "</tr>"
 
 	}
-
+	// ------------------------------------------ ALL OTHERS  --------------------------------------------------------
 	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all others")
-	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
-	}
+	tablebody += addSection("List of all others", columnnumber)
 	tablebody += "</tr>"
+
 	if len(others) > 0 {
 		for i := range others {
-			bits := strings.Split( others[i], "~")
+			bits := strings.Split(others[i], "~")
 			name := bits[0]
 			id := bits[1]
-			parents := getParents( id )
-
+			childcid := bits[2]									
+			parents := getParents(id)
 			rowspan := len(parents)
-
 			tablebody += "<tr>"
 
-
 			if len(parents) > 0 {
-				tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", rowspan + 1, name)
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a  target='_blank' href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", rowspan+1, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
 
-				for parent := range(parents) {
-					parentbits := strings.Split( parents[parent], "~")
-					parentcid := parentbits[1]			
-					//parentname := parentbits[0]			
+				for parent := range parents {
+					parentbits := strings.Split(parents[parent], "~")
+					parentcid := parentbits[1]
 					parenttitle := strings.ReplaceAll(parent, ".oet", "")
-	
-					tablebody += fmt.Sprintf( `        <tr>
-						<td></td>
-						<td></td>
-						<td><p><a href="https://ahsckm.ca/#showTemplate_%s">%s</a></p></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						</tr>    `, parentcid, parenttitle )
+
+					tablebody += addParentRow(parentcid, parenttitle)
 				}
 			} else {
-					tablebody += fmt.Sprintf("<td rowspan='%d'>%s</td>", 2, name)
-
-					tablebody += `        <tr>
-						<td></td>
-						<td></td>
-						<td><p>[ none ]</p></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						<td></td>
-						</tr>    `
+				tablebody += fmt.Sprintf("<td   style='font-family:Lato;' rowspan='%d' data-hyperlink='https://ahsckm.ca/#showTemplate_%s' ><p>• <a  target='_blank' href='https://ahsckm.ca/#showTemplate_%s'>%s</a></p></td>", 2, childcid, childcid, strings.ReplaceAll(name, ".oet", ""))
+				tablebody += addParentRowNone()
 			}
 
+/* 
+			if len(parents) > 0 {
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", rowspan+1, strings.ReplaceAll(name, ".oet", ""))
 
+				for parent := range parents {
+					parentbits := strings.Split(parents[parent], "~")
+					parentcid := parentbits[1]
+					parenttitle := strings.ReplaceAll(parent, ".oet", "")
+					tablebody += addParentRow(parentcid, parenttitle)
+				}
+			} else {
+				tablebody += fmt.Sprintf("<td rowspan='%d'>• %s</td>", 2, strings.ReplaceAll(name, ".oet", ""))
+				tablebody += addParentRowNone()
+			}
+ */
 			tablebody += "</tr>"
 		}
 	} else {
@@ -779,28 +894,42 @@ func getWUR(report *string, Path string) bool {
 		tablebody += "</tr>"
 
 	}
+	/* 	// TODO:
+	   	// ------------------------------------------ List of all Order Sets (not via a group, directly embedded)  --------------------------------------------------------
+	   	tablebody += "<tr>"
+	   	tablebody += fmt.Sprintf("<td data-fill-color='eaecec' data-a-h='center'  data-f-bold='true' style='background-color: rgba(234, 236, 236, 0.6);;'><b>%s</b></td>", "List of all Order Sets (not via a group, directly embedded)")
+	   	for i := 0; i < columnnumber; i++ {
+	   		tablebody += "<td data-fill-color='eaecec' style='background-color: rgba(234, 236, 236, 0.6);;'><b></b></td>"
+	   	}
+	   	tablebody += "</tr>"
 
+	   	tablebody += "<tr>"
+	   	tablebody += fmt.Sprintf("<td>%s</td>", "[ none ]")
+	   	tablebody += "</tr>"
+	   	tablebody += "</tbody>"
 
-	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td style='background-color: lightgrey;'><b>%s</b></td>", "List of all Order Sets (not via a group, directly embedded)")
-	for i := 0; i < 7; i++ {
-		tablebody += "<td style='background-color: lightgrey;'><b></b></td>"
-	}
-	tablebody += "</tr>"
-
-	tablebody += "<tr>"
-	tablebody += fmt.Sprintf("<td>%s</td>", "[ none ]")
-	tablebody += "</tr>"
-	tablebody += "</tbody>"
+	*/
+	// ---- build page
 
 	tabledef = tableheader + tablebody
-
 	overlaptemplate, _ := readlines2("html/wurreporttemplate.html")
+
+	exportbutton := fmt.Sprintf(`button.addEventListener("click", e => {
+		let table = document.querySelector("#my-table");
+			TableToExcel.convert(table, 
+				{
+					name: "WUR - %s.xlsx",
+					sheet: { name: "Sheet 1" }
+				}
+			)
+	  	});`, assetdisplayname)
 
 	var line string
 	for i := range overlaptemplate {
 		line = overlaptemplate[i]
 		line = strings.Replace(line, "<cdata>%%TABLE%%</cdata>", tabledef, -1)
+		line = strings.Replace(line, "<cdata>%%EXPORT%%</cdata>", exportbutton, -1)
+		line = strings.Replace(line, "%%ASSETNAME%%", assetdisplayname, -1)		
 		*report += line
 	}
 
@@ -1011,7 +1140,7 @@ func logMessage(message, ticket, logtype string) error {
 	INSERT INTO public.log
 	(message, messagetime, fromcomponent, focusticket, logtype)
 	VALUES( $1, $2, $3, $4, $5);`
-	_, err := db.Exec(sqlStatement, sessionConfig.SubjectPrefix + ": " + message, time.Now(), "DAMInform v"+gBuild, ticket, logtype)
+	_, err := db.Exec(sqlStatement, sessionConfig.SubjectPrefix+": "+message, time.Now(), "DAMInform v"+gBuild, ticket, logtype)
 
 	return err
 }

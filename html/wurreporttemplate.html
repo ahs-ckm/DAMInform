@@ -1,6 +1,9 @@
 <html>
 <head>
 <!--     <link href="/stylesheets/overlap.css" rel="stylesheet/css" type="text/css"> -->
+<script src="/html/tableToExcel/tableToExcel.js">
+</script>
+<title>WUR - %%ASSETNAME%%</title>
 
 </head>
 <style>
@@ -10,12 +13,12 @@
   display: inline-block;
   /* border-bottom: 1px dotted black;  *//* If you want dots under the hoverable text */
 }
-@font-face {
+/* @font-face {
     font-family: 'Lato-Light';
     src: url('fonts/Lato-Light.eot'), url('fonts/Lato-Light.ttf') format('truetype'), url('fonts/Lato-Light.svg') format('svg');
     font-weight: normal;
     font-style: normal;
-}
+} */
 /* Tooltip text */
 .tooltip .tooltiptext {
   visibility: hidden;
@@ -51,7 +54,7 @@
   }
  
 .table-header-rotated td {
-  text-align: center;
+  text-align: left;
   padding: 10px 5px;
   border: 1px solid #aaa;
 }
@@ -117,11 +120,18 @@ tbody th {
   border-right: 1px solid #aaa;
 }
 </style>
+<button id="button-excel">Export Spreadsheet</button>
+
+<script>
 
 
+let button = document.querySelector("#button-excel");
+
+<cdata>%%EXPORT%%</cdata>
+</script>
 
 
-<table nodeName="TABLE" class="table table-header-rotated" id="my-table" name="my-table">
+<table nodeName="TABLE" class="table table-header-rotated" id="my-table" name="my-table" data-cols-width="77,13,75,13,13,20">
     <cdata>%%TABLE%%</cdata>
 </table>
 
