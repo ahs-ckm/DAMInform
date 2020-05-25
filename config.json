@@ -4,7 +4,7 @@
 	"DBpw":       			"4h9OAtjWVL7k",
 	"DBPort":     			"5432",
 	"ListenPort": 			"9011",
-	"DBName":     			"dam_db",
+	"DBName":     			"dam",
 	"WorkingFolderPath":	"downloads/whereused",
 	"ChangesetPath": 		"/mnt/nas/syncthing/AHS/CMIO_Office/Clinical_Content/Repository/TD Repositories"	,
 	"TitleInProgress": 		"In Progress",

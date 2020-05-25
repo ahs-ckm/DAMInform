@@ -495,7 +495,7 @@ func getParents(assetID string) map[string]string {
 
 	m = make(map[string]string)
 
-	query := ` select ms_p.name, templateid, c.cid, rels.isReleased
+	query := ` select ms_p.filename, templateid, c.cid, rels.isReleased
 	 from public.mirrorstate_relationships rels
 	 left join ckmresource c on rels.parentid = c.resourcemainid
 	 inner join public.mirrorstate ms_p on ms_p.templateid = rels.parentid
